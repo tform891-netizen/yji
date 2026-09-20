@@ -10,20 +10,26 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  Collapsible, CollapsibleContent, CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { supabase } from "@/lib/supabase/client";
 import type { Database } from "@/lib/types/database";
 import { getStaffDisplayName, getStaffInitials } from "@/lib/hr/staff-utils";
-import { Building2, Users, ChevronRight, ChevronDown, Briefcase, UserX } from "lucide-react";
+import { Building2, Users, Briefcase, UserX } from "lucide-react";
 
 type Dept = Database["public"]["Tables"]["hr_departments"]["Row"];
 type Staff = Database["public"]["Tables"]["hr_staff"]["Row"];
 type Position = Database["public"]["Tables"]["hr_positions"]["Row"];
 
+type HolderInfo = {
+  id: string;
+  staff_number: string;
+  first_name: string | null;
+  last_name: string | null;
+  photo_url: string | null;
+  status: string;
+};
+
 type PositionWithHolder = Position & {
-  holder: { id: string; staff_number: string; first_name: string | null; last_name: string | null; photo_url: string | null; status: string } | null;
+  holder: HolderInfo | null;
 };
 
 type StaffWithAssignment = Staff & {
@@ -173,14 +179,14 @@ export default function OrgChartPage() {
 
   return (
     <div>
-      <PageHeader title="Organigramme" description="Structures et postes : Direction → Service → Postes & Personnel" />
+      <PageHeader title="Organigramme" description="Arbre généalogique : Direction → Service → Postes & Personnel" />
 
       {!hasData ? (
         <Card className="p-4">
           <EmptyState title="Aucune organisation" message="Créez des directions et des postes pour visualiser l'organigramme." />
         </Card>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {tree.length === 0 && unassignedStaff.length > 0 && (
             <Card className="p-4">
               <p className="text-sm text-muted-foreground mb-3">
@@ -190,7 +196,7 @@ export default function OrgChartPage() {
           )}
 
           {tree.map((node) => (
-            <DeptTreeNode key={node.id} node={node} depth={0} />
+            <TreeLevel key={node.id} nodes={[node]} isRoot={true} />
           ))}
 
           {unassignedStaff.length > 0 && (
@@ -213,75 +219,88 @@ export default function OrgChartPage() {
   );
 }
 
-function DeptTreeNode({ node, depth }: { node: DeptNode; depth: number }) {
-  const [open, setOpen] = useState(depth < 2);
+function TreeLevel({ nodes, isRoot }: { nodes: DeptNode[]; isRoot: boolean }) {
+  return (
+    <div className="flex flex-col items-center gap-0">
+      {/* Row of department nodes */}
+      <div className="flex items-start justify-center gap-6 flex-wrap">
+        {nodes.map((node) => (
+          <TreeNode key={node.id} node={node} isRoot={isRoot} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TreeNode({ node, isRoot }: { node: DeptNode; isRoot: boolean }) {
   const hasChildren = node.children.length > 0;
   const hasPositions = node.positions.length > 0;
   const hasStaff = node.staff.length > 0;
-  const hasContent = hasChildren || hasPositions || hasStaff;
   const vacantCount = node.positions.filter((p) => !p.holder).length;
 
   return (
-    <Card className="p-0 overflow-hidden">
-      <Collapsible open={open} onOpenChange={setOpen}>
-        <div
-          className="flex items-center gap-3 p-4 border-b border-border"
-          style={{ paddingLeft: `${16 + depth * 20}px` }}
-        >
-          {hasContent && (
-            <CollapsibleTrigger asChild>
-              <button className="text-muted-foreground hover:text-foreground transition-colors">
-                {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-              </button>
-            </CollapsibleTrigger>
-          )}
-          <div className="flex items-center gap-2 flex-1">
-            <Building2 className="w-4 h-4 text-primary" />
-            <span className="font-medium text-sm">{node.name}</span>
-            <Badge variant="outline" className="text-xs">{LEVEL_LABELS[node.level] ?? `Niveau ${node.level}`}</Badge>
-            <span className="text-xs text-muted-foreground">{node.code}</span>
+    <div className="flex flex-col items-center">
+      {/* Connector from parent to this node */}
+      {!isRoot && (
+        <div className="w-px h-6 bg-border" aria-hidden />
+      )}
+
+      {/* Department card */}
+      <div className="flex flex-col items-center">
+        <Card className="p-4 min-w-[220px] max-w-[300px] shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center gap-2 mb-2">
+            <Building2 className="w-5 h-5 text-primary shrink-0" />
+            <span className="font-semibold text-sm">{node.name}</span>
           </div>
-          <div className="flex items-center gap-2">
-            {hasPositions && <Badge variant="secondary" className="text-xs">{node.positions.length} poste{node.positions.length > 1 ? "s" : ""}</Badge>}
-            {vacantCount > 0 && <Badge variant="outline" className="text-xs text-amber-600">{vacantCount} vacant{vacantCount > 1 ? "s" : ""}</Badge>}
-            {hasChildren && <Badge variant="outline" className="text-xs">{node.children.length} sous.</Badge>}
-            {!node.is_active && <Badge variant="secondary">Inactif</Badge>}
+          <div className="flex items-center gap-1.5 flex-wrap mb-2">
+            <Badge variant="outline" className="text-[10px]">{LEVEL_LABELS[node.level] ?? `Niveau ${node.level}`}</Badge>
+            <span className="text-[10px] text-muted-foreground">{node.code}</span>
+            {!node.is_active && <Badge variant="secondary" className="text-[10px]">Inactif</Badge>}
           </div>
-        </div>
-
-        <CollapsibleContent>
-          {hasPositions && (
-            <div
-              className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
-              style={{ paddingLeft: `${16 + depth * 20}px` }}
-            >
-              {node.positions.map((p) => (
-                <PositionCard key={p.id} position={p} />
-              ))}
+          {(hasPositions || hasChildren) && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {hasPositions && <Badge variant="secondary" className="text-[10px]">{node.positions.length} poste{node.positions.length > 1 ? "s" : ""}</Badge>}
+              {vacantCount > 0 && <Badge variant="outline" className="text-[10px] text-amber-600">{vacantCount} vacant{vacantCount > 1 ? "s" : ""}</Badge>}
+              {hasChildren && <Badge variant="outline" className="text-[10px]">{node.children.length} sous.</Badge>}
             </div>
           )}
+        </Card>
 
-          {hasStaff && (
-            <div
-              className="p-4 pt-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
-              style={{ paddingLeft: `${16 + depth * 20}px` }}
-            >
-              {node.staff.map((s) => (
-                <StaffCard key={s.id} staff={s} />
-              ))}
-            </div>
-          )}
+        {/* Positions and staff inside this structure */}
+        {(hasPositions || hasStaff) && (
+          <div className="mt-3 p-3 rounded-lg border border-dashed border-border bg-muted/20 min-w-[200px] max-w-[300px] space-y-2">
+            {node.positions.map((p) => (
+              <PositionCard key={p.id} position={p} />
+            ))}
+            {node.staff.map((s) => (
+              <StaffCard key={s.id} staff={s} />
+            ))}
+          </div>
+        )}
+      </div>
 
-          {hasChildren && (
-            <div className="border-t border-border">
-              {node.children.map((child) => (
-                <DeptTreeNode key={child.id} node={child} depth={depth + 1} />
-              ))}
-            </div>
-          )}
-        </CollapsibleContent>
-      </Collapsible>
-    </Card>
+      {/* Connector down to children */}
+      {hasChildren && (
+        <>
+          <div className="w-px h-6 bg-border" aria-hidden />
+          <div className="relative flex items-start justify-center gap-6 flex-wrap">
+            {/* Horizontal connector bar above children */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 h-px bg-border"
+              style={{
+                width: "100%",
+                maxWidth: "100%",
+              }}
+            />
+            {node.children.map((child) => (
+              <div key={child.id} className="flex flex-col items-center">
+                <div className="w-px h-6 bg-border" aria-hidden />
+                <TreeNode node={child} isRoot={false} />
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -291,15 +310,15 @@ function PositionCard({ position }: { position: PositionWithHolder }) {
 
   if (isVacant) {
     return (
-      <div className="flex items-center gap-3 rounded-lg border border-dashed border-border p-3 bg-muted/30">
-        <div className="w-10 h-10 shrink-0 rounded-full bg-muted flex items-center justify-center">
-          <UserX className="w-5 h-5 text-muted-foreground" />
+      <div className="flex items-center gap-2 rounded-md border border-dashed border-amber-300 bg-amber-50/50 p-2">
+        <div className="w-8 h-8 shrink-0 rounded-full bg-muted flex items-center justify-center">
+          <UserX className="w-4 h-4 text-muted-foreground" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium truncate text-muted-foreground">Poste vacant</p>
-          <p className="text-xs text-muted-foreground truncate">{position.name}</p>
+          <p className="text-xs font-medium truncate text-muted-foreground">Poste vacant</p>
+          <p className="text-[10px] text-muted-foreground truncate">{position.name}</p>
         </div>
-        <Badge variant="outline" className="shrink-0 text-xs text-amber-600">Vacant</Badge>
+        <Badge variant="outline" className="shrink-0 text-[10px] text-amber-600 border-amber-300">Vacant</Badge>
       </div>
     );
   }
@@ -315,19 +334,19 @@ function PositionCard({ position }: { position: PositionWithHolder }) {
   };
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-border p-3 bg-card hover:shadow-sm transition-shadow">
-      <Avatar className="w-10 h-10 shrink-0">
+    <div className="flex items-center gap-2 rounded-md border border-border p-2 bg-card hover:shadow-sm transition-shadow">
+      <Avatar className="w-8 h-8 shrink-0">
         {holder!.photo_url && <AvatarImage src={holder!.photo_url} alt={displayName} />}
-        <AvatarFallback className="text-xs bg-primary text-white">{initials}</AvatarFallback>
+        <AvatarFallback className="text-[10px] bg-primary text-white">{initials}</AvatarFallback>
       </Avatar>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium truncate">{displayName}</p>
-        <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
-          <Briefcase className="w-3 h-3 shrink-0" />
+        <p className="text-xs font-medium truncate">{displayName}</p>
+        <p className="text-[10px] text-muted-foreground truncate flex items-center gap-0.5">
+          <Briefcase className="w-2.5 h-2.5 shrink-0" />
           {position.name}
         </p>
       </div>
-      <Badge variant={statusColors[holder!.status] ?? "secondary"} className="shrink-0 text-xs">
+      <Badge variant={statusColors[holder!.status] ?? "secondary"} className="shrink-0 text-[10px]">
         {holder!.status === "active" ? "Actif" : holder!.status === "on_leave" ? "Congé" : holder!.status}
       </Badge>
     </div>
@@ -348,19 +367,19 @@ function StaffCard({ staff }: { staff: StaffWithAssignment }) {
   };
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-border p-3 bg-card hover:shadow-sm transition-shadow">
-      <Avatar className="w-10 h-10 shrink-0">
+    <div className="flex items-center gap-2 rounded-md border border-border p-2 bg-card hover:shadow-sm transition-shadow">
+      <Avatar className="w-8 h-8 shrink-0">
         {staff.photo_url && <AvatarImage src={staff.photo_url} alt={displayName} />}
-        <AvatarFallback className="text-xs bg-primary text-white">{initials}</AvatarFallback>
+        <AvatarFallback className="text-[10px] bg-primary text-white">{initials}</AvatarFallback>
       </Avatar>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium truncate">{displayName}</p>
-        <p className="text-xs text-muted-foreground truncate">
+        <p className="text-xs font-medium truncate">{displayName}</p>
+        <p className="text-[10px] text-muted-foreground truncate">
           {positionName ?? staff.staff_number}
           {positionName && ` · ${staff.staff_number}`}
         </p>
       </div>
-      <Badge variant={statusColors[staff.status] ?? "secondary"} className="shrink-0 text-xs">
+      <Badge variant={statusColors[staff.status] ?? "secondary"} className="shrink-0 text-[10px]">
         {staff.status === "active" ? "Actif" : staff.status === "on_leave" ? "Congé" : staff.status}
       </Badge>
     </div>
