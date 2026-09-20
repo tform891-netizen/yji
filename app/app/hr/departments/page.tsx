@@ -238,7 +238,7 @@ function DepartmentFormDialog({
     if (open) {
       setCode(department?.code ?? "");
       setName(department?.name ?? "");
-      setParentId(department?.parent_id ?? "");
+      setParentId(department?.parent_id ?? "none");
       setDescription(department?.description ?? "");
       setIsActive(department?.is_active ?? true);
     }
@@ -256,7 +256,7 @@ function DepartmentFormDialog({
         institution_id: institutionId,
         code: code.trim(),
         name: name.trim(),
-        parent_id: parentId || null,
+        parent_id: parentId && parentId !== "none" ? parentId : null,
         description: description.trim() || null,
         is_active: isActive,
       };
@@ -304,7 +304,7 @@ function DepartmentFormDialog({
             <Select value={parentId} onValueChange={setParentId} disabled={saving}>
               <SelectTrigger id="dept-parent"><SelectValue placeholder="Aucun (niveau racine)" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Aucun (niveau racine)</SelectItem>
+                <SelectItem value="none">Aucun (niveau racine)</SelectItem>
                 {parentOptions.map((d) => (
                   <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                 ))}

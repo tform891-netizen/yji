@@ -301,7 +301,7 @@ function StaffFormDialog({
       setFirstName(staff?.first_name ?? "");
       setLastName(staff?.last_name ?? "");
       setPhotoUrl(staff?.photo_url ?? "");
-      setManagerId(staff?.manager_id ?? "");
+      setManagerId(staff?.manager_id ?? "none");
       setHireDate(staff?.hire_date ?? new Date().toISOString().slice(0, 10));
       setStatus(staff?.status ?? "active");
       setEmploymentType(staff?.employment_type ?? "");
@@ -357,7 +357,7 @@ function StaffFormDialog({
         first_name: firstName.trim(),
         last_name: lastName.trim(),
         photo_url: photoUrl || null,
-        manager_id: managerId || null,
+        manager_id: managerId && managerId !== "none" ? managerId : null,
         hire_date: hireDate,
         status,
         employment_type: employmentType || null,
@@ -474,7 +474,7 @@ function StaffFormDialog({
             <Select value={managerId} onValueChange={setManagerId} disabled={saving}>
               <SelectTrigger id="sf-manager"><SelectValue placeholder="Aucun (niveau supérieur)" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Aucun (niveau supérieur)</SelectItem>
+                <SelectItem value="none">Aucun (niveau supérieur)</SelectItem>
                 {managerOptions.map((m) => (
                   <SelectItem key={m.id} value={m.id}>{getStaffDisplayName(m)} ({m.staff_number})</SelectItem>
                 ))}
