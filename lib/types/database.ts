@@ -916,6 +916,7 @@ export interface Database {
         Row: {
           id: string;
           institution_id: string;
+          department_id: string | null;
           code: string;
           name: string;
           description: string | null;
@@ -927,6 +928,7 @@ export interface Database {
         Insert: {
           id?: string;
           institution_id: string;
+          department_id?: string | null;
           code: string;
           name: string;
           description?: string | null;
